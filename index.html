@@ -98,7 +98,7 @@
 
         <section id="phases" class="mb-24 scroll-mt-24">
             <h2 class="text-3xl font-bold text-slate-800 mb-2">Phases & Interactive Simulation</h2>
-            <p class="text-slate-600 mb-8">The project is divided into three functional phases. Use the tabs to switch between phases and interact with the simulation below to understand the system's logic.</p>
+            <p class="text-slate-600 mb-8">The project is divided into three functional phases. Use the tabs to switch between phases and interact with the simulation below to understand the system's logic, including how the 'missile' is aimed.</p>
             
             <div class="flex space-x-2 border-b border-slate-200 mb-6">
                 <button class="tab-btn px-4 py-2 rounded-t-md font-semibold text-slate-600 bg-slate-100" data-phase="1">Phase 1: Manual Input</button>
@@ -217,44 +217,79 @@ document.addEventListener('DOMContentLoaded', () => {
         const centerX = w / 2;
         const centerY = h / 2;
 
+        // Draw FPGA base
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(centerX - 25, centerY - 25, 50, 50);
+        ctx.fillRect(centerX - 30, centerY - 20, 60, 40);
         ctx.fillStyle = '#64748b';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('FPGA', centerX, centerY);
+        ctx.fillText('FPGA Base', centerX, centerY);
 
-        const canvasTargetX = centerX + (targetX / 100) * (w / 2.5);
-        const canvasTargetY = centerY - (targetY / 100) * (h / 2.5);
+        // Calculate target position on canvas
+        const canvasTargetX = centerX + (targetX / 100) * (w / 3);
+        const canvasTargetY = centerY - (targetY / 100) * (h / 3);
 
+        // Draw target
         ctx.beginPath();
         ctx.arc(canvasTargetX, canvasTargetY, 10, 0, 2 * Math.PI);
         ctx.fillStyle = '#ef4444';
         ctx.fill();
         ctx.strokeStyle = '#b91c1c';
+        ctx.lineWidth = 1;
         ctx.stroke();
 
-        const servoPositions = [
-            { x: centerX - 25, y: centerY - 25 },
-            { x: centerX + 25, y: centerY - 25 },
-            { x: centerX - 25, y: centerY + 25 },
-            { x: centerX + 25, y: centerY + 25 }
-        ];
+        // Calculate missile aiming angle relative to FPGA center
+        // Adjust for Y-axis inversion on canvas (positive Y is down)
+        const aimAngle = Math.atan2(canvasTargetY - centerY, canvasTargetX - centerX);
 
-        servoPositions.forEach(pos => {
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            
-            const angle = Math.atan2(canvasTargetY - pos.y, canvasTargetX - pos.x);
-            const lineEndX = pos.x + 30 * Math.cos(angle);
-            const lineEndY = pos.y + 30 * Math.sin(angle);
-            
-            ctx.lineTo(lineEndX, lineEndY);
-            ctx.strokeStyle = '#0ea5e9';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        });
-        ctx.lineWidth = 1;
+        // Draw missile (simplified triangle shape)
+        const missileLength = 50;
+        const missileWidth = 20;
+
+        ctx.save(); // Save the current canvas state (no rotation/translation)
+        ctx.translate(centerX, centerY); // Move origin to FPGA center
+
+        // Rotate canvas to aim the missile
+        ctx.rotate(aimAngle);
+
+        // Draw missile body (rectangle)
+        ctx.fillStyle = '#4f46e5';
+        ctx.fillRect(0, -missileWidth / 2, missileLength, missileWidth);
+
+        // Draw missile nose (triangle)
+        ctx.beginPath();
+        ctx.moveTo(missileLength, 0);
+        ctx.lineTo(missileLength + 15, 0);
+        ctx.lineTo(missileLength, -missileWidth / 2);
+        ctx.closePath();
+        ctx.fillStyle = '#f97316';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(missileLength, 0);
+        ctx.lineTo(missileLength + 15, 0);
+        ctx.lineTo(missileLength, missileWidth / 2);
+        ctx.closePath();
+        ctx.fillStyle = '#f97316';
+        ctx.fill();
+
+
+        // Draw aiming line from missile nose to target
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]); // Dashed line
+        ctx.moveTo(missileLength + 15, 0); // Start from missile nose tip (relative to rotated context)
+        
+        // Calculate target position relative to the missile's rotated coordinate system
+        const targetRelativeX = Math.cos(-aimAngle) * (canvasTargetX - centerX) - Math.sin(-aimAngle) * (canvasTargetY - centerY);
+        const targetRelativeY = Math.sin(-aimAngle) * (canvasTargetX - centerX) + Math.cos(-aimAngle) * (canvasTargetY - centerY);
+
+        ctx.lineTo(targetRelativeX, targetRelativeY);
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset line dash
+
+        ctx.restore(); // Restore canvas to original state (no rotation/translation)
     }
 
     function updatePhase(phase) {
